@@ -31,3 +31,18 @@ func (u Usuario) MostrarInformacion() {
 	fmt.Println("Correo:", u.correo)
 	fmt.Println("Plan:", u.planSuscripcion)
 }
+
+// GetNombre permite consultar el nombre del usuario.
+func (u Usuario) GetNombre() string {
+	return u.nombre
+}
+
+// SetNombre permite modificar el nombre del usuario.
+func (u *Usuario) SetNombre(nombre string) error {
+	if nombre == "" {
+		return fmt.Errorf("el nombre no puede estar vacío")
+	}
+
+	u.nombre = nombre
+	return nil
+}
