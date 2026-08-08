@@ -59,4 +59,42 @@ func main() {
 	fmt.Println("Título actualizado:", contenido.GetTitulo())
 	fmt.Println("Duración actualizada:", contenido.GetDuracion())
 
+	fmt.Println()
+
+	// Creamos las categorías del sistema.
+	categoria1 := NuevaCategoria(1, "Acción")
+	categoria2 := NuevaCategoria(2, "Comedia")
+	categoria3 := NuevaCategoria(3, "Ciencia ficción")
+
+	// Agregamos las categorías al sistema.
+	err = AgregarCategoria(categoria1)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+
+	err = AgregarCategoria(categoria2)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+
+	err = AgregarCategoria(categoria3)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+
+	// Probamos el registro de una categoría sin nombre.
+	categoriaError := NuevaCategoria(4, "")
+
+	err = AgregarCategoria(categoriaError)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+
+	// Mostramos las categorías registradas.
+	ListarCategorias()
+
 }
