@@ -52,7 +52,7 @@ func AgregarCategoria(categoria *Categoria) error {
 
 // ListarCategorias muestra todas las categorías registradas.
 func ListarCategorias() {
-	fmt.Println("=== CATEGORIAS REGISTRADAS ===")
+	fmt.Println("=== CATEGORÍAS REGISTRADAS ===")
 
 	for _, categoria := range categorias {
 		fmt.Println(

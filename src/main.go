@@ -116,4 +116,11 @@ func main() {
 		elemento.Reproducir()
 	}
 
+	fmt.Println()
+
+	// Comprobamos que Pelicula y Serie reutilizan
+	// los métodos de Contenido mediante la incrustación.
+	fmt.Println("Título de la película:", pelicula.GetTitulo())
+	fmt.Println("Título de la serie:", serie.GetTitulo())
+
 }

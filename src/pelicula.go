@@ -2,18 +2,24 @@ package main
 
 import "fmt"
 
-// Pelicula representa una película que puede ser reproducida
-// dentro de la plataforma de streaming.
+// Pelicula representa una película y reutiliza
+// los atributos y métodos de Contenido mediante incrustación.
 type Pelicula struct {
-	titulo   string
-	duracion int
+	Contenido
 }
 
-// NuevaPelicula crea una nueva película con su título y duración.
-func NuevaPelicula(titulo string, duracion int) *Pelicula {
+// NuevaPelicula crea una nueva película utilizando
+// la información general definida en Contenido.
+func NuevaPelicula(
+	titulo string,
+	duracion int,
+) *Pelicula {
+
 	return &Pelicula{
-		titulo:   titulo,
-		duracion: duracion,
+		Contenido: Contenido{
+			titulo:   titulo,
+			duracion: duracion,
+		},
 	}
 }
 

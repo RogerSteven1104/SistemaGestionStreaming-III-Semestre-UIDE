@@ -2,17 +2,20 @@ package main
 
 import "fmt"
 
-// Serie representa una serie disponible para reproducirse
-// dentro de la plataforma de streaming.
+// Serie representa una serie y reutiliza
+// los atributos y métodos de Contenido mediante incrustación.
 type Serie struct {
-	titulo     string
+	Contenido
 	temporadas int
 }
 
-// NuevaSerie crea una nueva serie con su título y número de temporadas.
+// NuevaSerie crea una nueva serie utilizando
+// la información general definida en Contenido.
 func NuevaSerie(titulo string, temporadas int) *Serie {
 	return &Serie{
-		titulo:     titulo,
+		Contenido: Contenido{
+			titulo: titulo,
+		},
 		temporadas: temporadas,
 	}
 }
