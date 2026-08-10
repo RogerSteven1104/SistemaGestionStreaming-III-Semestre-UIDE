@@ -97,4 +97,23 @@ func main() {
 	// Mostramos las categorías registradas.
 	ListarCategorias()
 
+	fmt.Println()
+
+	// Creamos una película y una serie.
+	pelicula := NuevaPelicula("Avatar 2", 180)
+	serie := NuevaSerie("Stranger Things", 5)
+
+	// Guardamos diferentes tipos en una colección de la interfaz.
+	elementosReproducibles := []Reproducible{
+		contenido,
+		pelicula,
+		serie,
+	}
+
+	// Recorremos la colección y ejecutamos el mismo método
+	// sobre diferentes tipos de objetos.
+	for _, elemento := range elementosReproducibles {
+		elemento.Reproducir()
+	}
+
 }

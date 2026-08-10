@@ -87,3 +87,8 @@ func (c *Contenido) SetDuracion(duracion int) error {
 	c.duracion = duracion
 	return nil
 }
+
+// Reproducir muestra un mensaje indicando que el contenido está siendo reproducido.
+func (c Contenido) Reproducir() {
+	fmt.Println("Reproduciendo:", c.titulo)
+}
