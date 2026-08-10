@@ -45,7 +45,6 @@ func main() {
 
 	fmt.Println()
 
-	// Probamos la validación del título.
 	// Actualizamos información del contenido utilizando los Setter.
 	err = contenido.SetTitulo("Avatar 2")
 
@@ -96,6 +95,7 @@ func main() {
 	if err != nil {
 		fmt.Println("Error:", err)
 
+		// Identificamos específicamente el tipo de error.
 		if errors.Is(err, ErrCategoriaInvalida) {
 			fmt.Println("Validación: la categoría ingresada no es válida")
 		}
@@ -110,18 +110,28 @@ func main() {
 	pelicula := NuevaPelicula("Avatar 2", 180)
 	serie := NuevaSerie("Stranger Things", 5)
 
-	// Guardamos diferentes tipos en una colección de la interfaz.
-	elementosReproducibles := []Reproducible{
-		contenido,
-		pelicula,
-		serie,
+	// Registramos los diferentes tipos de contenido
+	// en el catálogo mediante la interfaz Reproducible.
+	err = AgregarReproducible(contenido)
+
+	if err != nil {
+		fmt.Println("Error:", err)
 	}
 
-	// Recorremos la colección y ejecutamos el mismo método
-	// sobre diferentes tipos de objetos.
-	for _, elemento := range elementosReproducibles {
-		elemento.Reproducir()
+	err = AgregarReproducible(pelicula)
+
+	if err != nil {
+		fmt.Println("Error:", err)
 	}
+
+	err = AgregarReproducible(serie)
+
+	if err != nil {
+		fmt.Println("Error:", err)
+	}
+
+	// Reproducimos todos los contenidos registrados.
+	ReproducirCatalogo()
 
 	fmt.Println()
 
@@ -129,5 +139,4 @@ func main() {
 	// los métodos de Contenido mediante la incrustación.
 	fmt.Println("Título de la película:", pelicula.GetTitulo())
 	fmt.Println("Título de la serie:", serie.GetTitulo())
-
 }
