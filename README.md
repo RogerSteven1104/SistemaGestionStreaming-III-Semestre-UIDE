@@ -64,6 +64,33 @@ Las siguientes fases incluirán:
 - Pruebas del software.
 - Mejoras y documentación final.
 
+
+## Funcionalidades implementadas
+
+- Gestión de usuarios.
+- Gestión de contenidos.
+- Registro de categorías.
+- Gestión de películas y series.
+- Encapsulación mediante getters y setters.
+- Validación de datos.
+- Manejo de errores personalizados.
+- Interfaces.
+- Polimorfismo.
+- Incrustación de structs.
+- Catálogo de reproducción.
+
+## Estructura del proyecto
+
+```text
+src/
+├── categoria.go
+├── contenido.go
+├── errores.go
+├── main.go
+├── pelicula.go
+├── reproducible.go
+├── serie.go
+└── usuario.go
 ---
 
 ## Autor
