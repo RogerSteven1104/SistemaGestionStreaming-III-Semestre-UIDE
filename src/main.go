@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+)
 
 func main() {
 
@@ -92,6 +95,10 @@ func main() {
 
 	if err != nil {
 		fmt.Println("Error:", err)
+
+		if errors.Is(err, ErrCategoriaInvalida) {
+			fmt.Println("Validación: la categoría ingresada no es válida")
+		}
 	}
 
 	// Mostramos las categorías registradas.

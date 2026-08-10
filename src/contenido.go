@@ -51,11 +51,12 @@ func (c Contenido) GetTitulo() string {
 // SetTitulo permite modificar el título validando que no esté vacío.
 func (c *Contenido) SetTitulo(titulo string) error {
 	if titulo == "" {
-		return fmt.Errorf("el título no puede estar vacío")
+		return ErrTituloVacio
 	}
 
 	c.titulo = titulo
 	return nil
+
 }
 
 // GetGenero permite consultar el género del contenido.
@@ -81,7 +82,7 @@ func (c Contenido) GetDuracion() int {
 // SetDuracion permite modificar la duración validando que sea mayor que cero.
 func (c *Contenido) SetDuracion(duracion int) error {
 	if duracion <= 0 {
-		return fmt.Errorf("la duración debe ser mayor que cero")
+		return ErrDuracionInvalida
 	}
 
 	c.duracion = duracion

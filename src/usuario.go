@@ -40,7 +40,7 @@ func (u Usuario) GetNombre() string {
 // SetNombre permite modificar el nombre del usuario.
 func (u *Usuario) SetNombre(nombre string) error {
 	if nombre == "" {
-		return fmt.Errorf("el nombre no puede estar vacío")
+		return ErrNombreVacio
 	}
 
 	u.nombre = nombre

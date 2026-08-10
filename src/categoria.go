@@ -25,7 +25,7 @@ func (c Categoria) GetNombre() string {
 // SetNombre permite modificar el nombre de la categoría.
 func (c *Categoria) SetNombre(nombre string) error {
 	if nombre == "" {
-		return fmt.Errorf("el nombre de la categoría no puede estar vacío")
+		return ErrCategoriaInvalida
 	}
 
 	c.nombreCategoria = nombre
@@ -42,7 +42,7 @@ func AgregarCategoria(categoria *Categoria) error {
 	}
 
 	if categoria.GetNombre() == "" {
-		return fmt.Errorf("no se puede agregar una categoría sin nombre")
+		return ErrCategoriaInvalida
 	}
 
 	categorias = append(categorias, categoria)
