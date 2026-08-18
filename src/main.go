@@ -139,4 +139,10 @@ func main() {
 	// los métodos de Contenido mediante la incrustación.
 	fmt.Println("Título de la película:", pelicula.GetTitulo())
 	fmt.Println("Título de la serie:", serie.GetTitulo())
+
+	fmt.Println()
+
+	// Iniciamos el servidor web.
+	iniciarServidor()
+
 }
