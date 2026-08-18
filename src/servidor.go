@@ -26,6 +26,14 @@ type UsuarioRespuesta struct {
 	Plan   string `json:"plan"`
 }
 
+// ReproduccionRespuesta representa el resultado de reproducir
+// un contenido mediante el servicio web.
+type ReproduccionRespuesta struct {
+	Tipo    string `json:"tipo"`
+	Titulo  string `json:"titulo"`
+	Mensaje string `json:"mensaje"`
+}
+
 // servicioContenidos devuelve los contenidos registrados
 // en el sistema utilizando formato JSON.
 func servicioContenidos(w http.ResponseWriter, r *http.Request) {
@@ -97,6 +105,48 @@ func servicioUsuarios(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// servicioReproduccion demuestra la reproducción de diferentes
+// tipos de contenido utilizando las estructuras Pelicula y Serie.
+func servicioReproduccion(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	pelicula := NuevaPelicula(
+		"Avatar 2",
+		180,
+	)
+
+	serie := NuevaSerie(
+		"Stranger Things",
+		4,
+	)
+
+	respuestas := []ReproduccionRespuesta{
+		{
+			Tipo:    "pelicula",
+			Titulo:  pelicula.GetTitulo(),
+			Mensaje: "Reproduciendo película: " + pelicula.GetTitulo(),
+		},
+		{
+			Tipo:    "serie",
+			Titulo:  serie.GetTitulo(),
+			Mensaje: "Reproduciendo serie: " + serie.GetTitulo(),
+		},
+	}
+
+	err := json.NewEncoder(w).Encode(respuestas)
+
+	if err != nil {
+		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
+		return
+	}
+}
+
 // iniciarServidor configura y pone en funcionamiento
 // el servidor web del Sistema de Gestión de Streaming.
 func iniciarServidor() {
@@ -142,6 +192,9 @@ func iniciarServidor() {
 
 	// Servicio Web #3: consulta de información de usuarios.
 	http.HandleFunc("/api/usuarios", servicioUsuarios)
+
+	// Servicio Web #4: reproducción de películas y series.
+	http.HandleFunc("/api/reproduccion", servicioReproduccion)
 
 	fmt.Println("=== SISTEMA DE GESTIÓN DE STREAMING ===")
 	fmt.Println("Servidor iniciado en http://localhost:8080")
