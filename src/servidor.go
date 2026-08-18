@@ -34,6 +34,14 @@ type ReproduccionRespuesta struct {
 	Mensaje string `json:"mensaje"`
 }
 
+// PlanRespuesta representa la información de un plan
+// de suscripción disponible en el sistema.
+type PlanRespuesta struct {
+	ID     int     `json:"id"`
+	Nombre string  `json:"nombre"`
+	Precio float64 `json:"precio"`
+}
+
 // servicioContenidos devuelve los contenidos registrados
 // en el sistema utilizando formato JSON.
 func servicioContenidos(w http.ResponseWriter, r *http.Request) {
@@ -147,6 +155,43 @@ func servicioReproduccion(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// servicioPlanes devuelve los planes de suscripción
+// disponibles en el sistema utilizando formato JSON.
+func servicioPlanes(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	planes := []PlanRespuesta{
+		{
+			ID:     1,
+			Nombre: "Básico",
+			Precio: 7.99,
+		},
+		{
+			ID:     2,
+			Nombre: "Estándar",
+			Precio: 10.99,
+		},
+		{
+			ID:     3,
+			Nombre: "Premium",
+			Precio: 14.99,
+		},
+	}
+
+	err := json.NewEncoder(w).Encode(planes)
+
+	if err != nil {
+		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
+		return
+	}
+}
+
 // iniciarServidor configura y pone en funcionamiento
 // el servidor web del Sistema de Gestión de Streaming.
 func iniciarServidor() {
@@ -195,6 +240,9 @@ func iniciarServidor() {
 
 	// Servicio Web #4: reproducción de películas y series.
 	http.HandleFunc("/api/reproduccion", servicioReproduccion)
+
+	// Servicio Web #5: consulta de planes de suscripción.
+	http.HandleFunc("/api/planes", servicioPlanes)
 
 	fmt.Println("=== SISTEMA DE GESTIÓN DE STREAMING ===")
 	fmt.Println("Servidor iniciado en http://localhost:8080")
