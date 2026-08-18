@@ -32,9 +32,24 @@ func (u Usuario) MostrarInformacion() {
 	fmt.Println("Plan:", u.planSuscripcion)
 }
 
+// GetID permite consultar el identificador del usuario.
+func (u Usuario) GetID() int {
+	return u.idUsuario
+}
+
 // GetNombre permite consultar el nombre del usuario.
 func (u Usuario) GetNombre() string {
 	return u.nombre
+}
+
+// GetCorreo permite consultar el correo del usuario.
+func (u Usuario) GetCorreo() string {
+	return u.correo
+}
+
+// GetPlan permite consultar el plan de suscripción del usuario.
+func (u Usuario) GetPlan() string {
+	return u.planSuscripcion
 }
 
 // SetNombre permite modificar el nombre del usuario.

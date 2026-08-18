@@ -17,11 +17,25 @@ type ContenidoRespuesta struct {
 	Clasificacion string `json:"clasificacion"`
 }
 
+// UsuarioRespuesta representa la información pública
+// de un usuario que será enviada mediante JSON.
+type UsuarioRespuesta struct {
+	ID     int    `json:"id"`
+	Nombre string `json:"nombre"`
+	Correo string `json:"correo"`
+	Plan   string `json:"plan"`
+}
+
 // servicioContenidos devuelve los contenidos registrados
 // en el sistema utilizando formato JSON.
 func servicioContenidos(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
 
 	contenido := NuevoContenido(
 		1,
@@ -49,8 +63,45 @@ func servicioContenidos(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// servicioUsuarios devuelve la información pública
+// de los usuarios registrados en formato JSON.
+func servicioUsuarios(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	usuario := NuevoUsuario(
+		1,
+		"Carlos",
+		"roger@email.com",
+		"123456",
+		"Premium",
+	)
+
+	respuesta := UsuarioRespuesta{
+		ID:     usuario.GetID(),
+		Nombre: usuario.GetNombre(),
+		Correo: usuario.GetCorreo(),
+		Plan:   usuario.GetPlan(),
+	}
+
+	err := json.NewEncoder(w).Encode([]UsuarioRespuesta{respuesta})
+
+	if err != nil {
+		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
+		return
+	}
+}
+
+// iniciarServidor configura y pone en funcionamiento
+// el servidor web del Sistema de Gestión de Streaming.
 func iniciarServidor() {
 
+	// Ruta principal del servidor.
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -81,8 +132,16 @@ func iniciarServidor() {
 			})
 		}
 
-		json.NewEncoder(w).Encode(categoriasJSON)
+		err := json.NewEncoder(w).Encode(categoriasJSON)
+
+		if err != nil {
+			http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
+			return
+		}
 	})
+
+	// Servicio Web #3: consulta de información de usuarios.
+	http.HandleFunc("/api/usuarios", servicioUsuarios)
 
 	fmt.Println("=== SISTEMA DE GESTIÓN DE STREAMING ===")
 	fmt.Println("Servidor iniciado en http://localhost:8080")
@@ -92,5 +151,4 @@ func iniciarServidor() {
 	if err != nil {
 		fmt.Println("Error al iniciar el servidor:", err)
 	}
-
 }
