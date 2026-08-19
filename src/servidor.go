@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-// ContenidoRespuesta representa la información que se enviará
-// al cliente mediante el servicio web en formato JSON.
+// ContenidoRespuesta representa la información pública de un contenido
+// que será enviada mediante JSON.
 type ContenidoRespuesta struct {
 	ID            int    `json:"id"`
 	Titulo        string `json:"titulo"`
@@ -19,8 +19,7 @@ type ContenidoRespuesta struct {
 	Clasificacion string `json:"clasificacion"`
 }
 
-// UsuarioRespuesta representa la información pública
-// de un usuario que será enviada mediante JSON.
+// UsuarioRespuesta representa la información pública de un usuario.
 type UsuarioRespuesta struct {
 	ID     int    `json:"id"`
 	Nombre string `json:"nombre"`
@@ -36,95 +35,248 @@ type ReproduccionRespuesta struct {
 	Mensaje string `json:"mensaje"`
 }
 
-// PlanRespuesta representa la información de un plan
-// de suscripción disponible en el sistema.
+// PlanRespuesta representa un plan de suscripción.
 type PlanRespuesta struct {
 	ID     int     `json:"id"`
 	Nombre string  `json:"nombre"`
 	Precio float64 `json:"precio"`
 }
 
+// NuevoContenidoRequest representa los datos recibidos
+// para crear un nuevo contenido mediante POST.
+type NuevoContenidoRequest struct {
+	Titulo        string `json:"titulo"`
+	Descripcion   string `json:"descripcion"`
+	Genero        string `json:"genero"`
+	Duracion      int    `json:"duracion"`
+	Clasificacion string `json:"clasificacion"`
+}
+
 // ActualizacionContenido representa los datos que pueden
-// modificarse mediante el servicio PUT.
+// modificarse mediante PUT.
 type ActualizacionContenido struct {
 	Titulo   string `json:"titulo"`
 	Duracion int    `json:"duracion"`
 	Genero   string `json:"genero"`
 }
 
-// servicioContenidos devuelve los contenidos registrados
-// en el sistema utilizando formato JSON.
+// ============================================================
+// CATÁLOGO CENTRAL DE CONTENIDOS
+// ============================================================
+
+// contenidos almacenará los contenidos registrados
+// actualmente en el sistema.
+var contenidos = []ContenidoRespuesta{
+	{
+		ID:            1,
+		Titulo:        "Avatar 2",
+		Descripcion:   "Una historia de ciencia ficción en Pandora.",
+		Genero:        "Ciencia ficción",
+		Duracion:      180,
+		Clasificacion: "PG-13",
+	},
+	{
+		ID:            2,
+		Titulo:        "John Wick",
+		Descripcion:   "Un antiguo asesino regresa a la acción.",
+		Genero:        "Acción",
+		Duracion:      101,
+		Clasificacion: "R",
+	},
+	{
+		ID:            3,
+		Titulo:        "Son como niños",
+		Descripcion:   "Un grupo de amigos se reúne nuevamente.",
+		Genero:        "Comedia",
+		Duracion:      102,
+		Clasificacion: "PG-13",
+	},
+}
+
+// ============================================================
+// SERVICIO WEB 1
+// GET /api/contenidos
+// ============================================================
+
+// servicioContenidos devuelve el catálogo de contenidos
+// disponibles en el sistema.
 func servicioContenidos(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		http.Error(
+			w,
+			"Método no permitido. Utilice GET.",
+			http.StatusMethodNotAllowed,
+		)
 		return
 	}
 
-	contenido := NuevoContenido(
-		1,
-		"Avatar 2",
-		"Una historia de ciencia ficción en Pandora.",
-		"Ciencia ficción",
-		180,
-		"PG-13",
-	)
-
-	respuesta := ContenidoRespuesta{
-		ID:            1,
-		Titulo:        contenido.GetTitulo(),
-		Descripcion:   "Una historia de ciencia ficción en Pandora.",
-		Genero:        contenido.GetGenero(),
-		Duracion:      contenido.GetDuracion(),
-		Clasificacion: "PG-13",
-	}
-
-	err := json.NewEncoder(w).Encode(respuesta)
-
-	if err != nil {
-		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
-		return
-	}
+	json.NewEncoder(w).Encode(contenidos)
 }
 
-// servicioCategorias devuelve las categorías registradas
-// en el sistema utilizando formato JSON.
+// ============================================================
+// SERVICIO WEB 2
+// POST /api/contenidos
+// ============================================================
+
+// servicioCrearContenido permite registrar un nuevo contenido.
+func servicioCrearContenido(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	if r.Method != http.MethodPost {
+		http.Error(
+			w,
+			"Método no permitido. Utilice POST.",
+			http.StatusMethodNotAllowed,
+		)
+		return
+	}
+
+	var datos NuevoContenidoRequest
+
+	err := json.NewDecoder(r.Body).Decode(&datos)
+
+	if err != nil {
+		http.Error(w, "JSON inválido", http.StatusBadRequest)
+		return
+	}
+
+	datos.Titulo = strings.TrimSpace(datos.Titulo)
+	datos.Descripcion = strings.TrimSpace(datos.Descripcion)
+	datos.Genero = strings.TrimSpace(datos.Genero)
+	datos.Clasificacion = strings.TrimSpace(datos.Clasificacion)
+
+	if datos.Titulo == "" {
+		http.Error(
+			w,
+			"El título no puede estar vacío",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if datos.Descripcion == "" {
+		http.Error(
+			w,
+			"La descripción no puede estar vacía",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if datos.Genero == "" {
+		http.Error(
+			w,
+			"El género no puede estar vacío",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if datos.Duracion <= 0 {
+		http.Error(
+			w,
+			"La duración debe ser mayor que cero",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	if datos.Clasificacion == "" {
+		http.Error(
+			w,
+			"La clasificación no puede estar vacía",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	nuevoID := 4
+
+	contenido := NuevoContenido(
+		nuevoID,
+		datos.Titulo,
+		datos.Descripcion,
+		datos.Genero,
+		datos.Duracion,
+		datos.Clasificacion,
+	)
+
+	nuevoContenido := ContenidoRespuesta{
+		ID:            contenido.idContenido,
+		Titulo:        contenido.GetTitulo(),
+		Descripcion:   contenido.descripcion,
+		Genero:        contenido.GetGenero(),
+		Duracion:      contenido.GetDuracion(),
+		Clasificacion: contenido.clasificacion,
+	}
+
+	contenidos = append(contenidos, nuevoContenido)
+
+	respuesta := map[string]interface{}{
+		"contenido": nuevoContenido,
+		"mensaje":   "Contenido creado correctamente",
+	}
+
+	w.WriteHeader(http.StatusCreated)
+
+	json.NewEncoder(w).Encode(respuesta)
+}
+
+// ============================================================
+// SERVICIO WEB 3
+// GET /api/categorias
+// ============================================================
+
+// servicioCategorias devuelve las categorías registradas.
 func servicioCategorias(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		http.Error(
+			w,
+			"Método no permitido. Utilice GET.",
+			http.StatusMethodNotAllowed,
+		)
 		return
 	}
 
 	categoriasJSON := []map[string]interface{}{}
 
 	for _, categoria := range categorias {
-		categoriasJSON = append(categoriasJSON, map[string]interface{}{
-			"id":     categoria.idCategoria,
-			"nombre": categoria.GetNombre(),
-		})
+
+		categoriasJSON = append(
+			categoriasJSON,
+			map[string]interface{}{
+				"id":     categoria.idCategoria,
+				"nombre": categoria.GetNombre(),
+			},
+		)
 	}
 
-	err := json.NewEncoder(w).Encode(categoriasJSON)
-
-	if err != nil {
-		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
-		return
-	}
+	json.NewEncoder(w).Encode(categoriasJSON)
 }
 
-// servicioUsuarios devuelve la información pública
-// de los usuarios registrados en formato JSON.
+// ============================================================
+// SERVICIO WEB 4
+// GET /api/usuarios
+// ============================================================
+
+// servicioUsuarios devuelve información pública de los usuarios.
 func servicioUsuarios(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		http.Error(
+			w,
+			"Método no permitido. Utilice GET.",
+			http.StatusMethodNotAllowed,
+		)
 		return
 	}
 
@@ -136,29 +288,35 @@ func servicioUsuarios(w http.ResponseWriter, r *http.Request) {
 		"Premium",
 	)
 
-	respuesta := UsuarioRespuesta{
-		ID:     usuario.GetID(),
-		Nombre: usuario.GetNombre(),
-		Correo: usuario.GetCorreo(),
-		Plan:   usuario.GetPlan(),
+	respuesta := []UsuarioRespuesta{
+		{
+			ID:     usuario.GetID(),
+			Nombre: usuario.GetNombre(),
+			Correo: usuario.GetCorreo(),
+			Plan:   usuario.GetPlan(),
+		},
 	}
 
-	err := json.NewEncoder(w).Encode([]UsuarioRespuesta{respuesta})
-
-	if err != nil {
-		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
-		return
-	}
+	json.NewEncoder(w).Encode(respuesta)
 }
 
-// servicioReproduccion demuestra la reproducción de diferentes
-// tipos de contenido utilizando las estructuras Pelicula y Serie.
+// ============================================================
+// SERVICIO WEB 5
+// GET /api/reproduccion
+// ============================================================
+
+// servicioReproduccion demuestra el uso de interfaces,
+// incrustación y polimorfismo mediante películas y series.
 func servicioReproduccion(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		http.Error(
+			w,
+			"Método no permitido. Utilice GET.",
+			http.StatusMethodNotAllowed,
+		)
 		return
 	}
 
@@ -185,22 +343,25 @@ func servicioReproduccion(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	err := json.NewEncoder(w).Encode(respuestas)
-
-	if err != nil {
-		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
-		return
-	}
+	json.NewEncoder(w).Encode(respuestas)
 }
 
-// servicioPlanes devuelve los planes de suscripción
-// disponibles en el sistema utilizando formato JSON.
+// ============================================================
+// SERVICIO WEB 6
+// GET /api/planes
+// ============================================================
+
+// servicioPlanes devuelve los planes de suscripción disponibles.
 func servicioPlanes(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		http.Error(
+			w,
+			"Método no permitido. Utilice GET.",
+			http.StatusMethodNotAllowed,
+		)
 		return
 	}
 
@@ -222,26 +383,31 @@ func servicioPlanes(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	err := json.NewEncoder(w).Encode(planes)
-
-	if err != nil {
-		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
-		return
-	}
+	json.NewEncoder(w).Encode(planes)
 }
 
-// servicioBuscarContenido permite buscar contenidos
-// utilizando el género recibido como parámetro.
+// ============================================================
+// SERVICIO WEB 7
+// GET /api/contenidos/buscar?genero=...
+// ============================================================
+
+// servicioBuscarContenido permite buscar contenidos por género.
 func servicioBuscarContenido(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		http.Error(
+			w,
+			"Método no permitido. Utilice GET.",
+			http.StatusMethodNotAllowed,
+		)
 		return
 	}
 
-	generoBuscado := strings.TrimSpace(r.URL.Query().Get("genero"))
+	generoBuscado := strings.TrimSpace(
+		r.URL.Query().Get("genero"),
+	)
 
 	if generoBuscado == "" {
 		http.Error(
@@ -282,7 +448,11 @@ func servicioBuscarContenido(w http.ResponseWriter, r *http.Request) {
 	resultados := []ContenidoRespuesta{}
 
 	for _, contenido := range contenidos {
-		if strings.EqualFold(contenido.Genero, generoBuscado) {
+
+		if strings.EqualFold(
+			contenido.Genero,
+			generoBuscado,
+		) {
 			resultados = append(resultados, contenido)
 		}
 	}
@@ -296,41 +466,69 @@ func servicioBuscarContenido(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := json.NewEncoder(w).Encode(resultados)
-
-	if err != nil {
-		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
-		return
-	}
+	json.NewEncoder(w).Encode(resultados)
 }
 
-// servicioActualizarContenido permite modificar un contenido
-// mediante una solicitud HTTP PUT.
+// ============================================================
+// SERVICIO WEB 8
+// PUT /api/contenidos/{id}
+// ============================================================
+// servicioActualizarContenido permite actualizar un contenido existente.
 func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	if r.Method != http.MethodPut {
-		http.Error(w, "Método no permitido. Utilice PUT.", http.StatusMethodNotAllowed)
+		http.Error(
+			w,
+			"Método no permitido. Utilice PUT.",
+			http.StatusMethodNotAllowed,
+		)
 		return
 	}
 
-	partes := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	partes := strings.Split(
+		strings.Trim(r.URL.Path, "/"),
+		"/",
+	)
 
 	if len(partes) != 3 {
-		http.Error(w, "Identificador de contenido inválido", http.StatusBadRequest)
+		http.Error(
+			w,
+			"Identificador de contenido inválido",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
 	id, err := strconv.Atoi(partes[2])
 
 	if err != nil {
-		http.Error(w, "El ID debe ser numérico", http.StatusBadRequest)
+		http.Error(
+			w,
+			"El ID debe ser numérico",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
-	if id != 1 {
-		http.Error(w, "Contenido no encontrado", http.StatusNotFound)
+	// Buscar el contenido dentro del catálogo central.
+	indice := -1
+
+	for i, contenido := range contenidos {
+		if contenido.ID == id {
+			indice = i
+			break
+		}
+	}
+
+	// Si no existe, devolver error 404.
+	if indice == -1 {
+		http.Error(
+			w,
+			"Contenido no encontrado",
+			http.StatusNotFound,
+		)
 		return
 	}
 
@@ -339,7 +537,11 @@ func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 	err = json.NewDecoder(r.Body).Decode(&datos)
 
 	if err != nil {
-		http.Error(w, "JSON inválido", http.StatusBadRequest)
+		http.Error(
+			w,
+			"JSON inválido",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
@@ -347,78 +549,95 @@ func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 	datos.Genero = strings.TrimSpace(datos.Genero)
 
 	if datos.Titulo == "" {
-		http.Error(w, "El título no puede estar vacío", http.StatusBadRequest)
+		http.Error(
+			w,
+			"El título no puede estar vacío",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
 	if datos.Genero == "" {
-		http.Error(w, "El género no puede estar vacío", http.StatusBadRequest)
+		http.Error(
+			w,
+			"El género no puede estar vacío",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
 	if datos.Duracion <= 0 {
-		http.Error(w, "La duración debe ser mayor que cero", http.StatusBadRequest)
+		http.Error(
+			w,
+			"La duración debe ser mayor que cero",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
-	contenido := NuevoContenido(
-		id,
-		datos.Titulo,
-		"Una historia de ciencia ficción en Pandora.",
-		datos.Genero,
-		datos.Duracion,
-		"PG-13",
-	)
+	// Actualizar el contenido existente dentro del catálogo.
+	contenidos[indice].Titulo = datos.Titulo
+	contenidos[indice].Genero = datos.Genero
+	contenidos[indice].Duracion = datos.Duracion
 
 	respuesta := map[string]interface{}{
-		"mensaje": "Contenido actualizado correctamente",
-		"contenido": ContenidoRespuesta{
-			ID:            contenido.idContenido,
-			Titulo:        contenido.GetTitulo(),
-			Descripcion:   contenido.descripcion,
-			Genero:        contenido.GetGenero(),
-			Duracion:      contenido.GetDuracion(),
-			Clasificacion: contenido.clasificacion,
-		},
+		"mensaje":   "Contenido actualizado correctamente",
+		"contenido": contenidos[indice],
 	}
 
-	err = json.NewEncoder(w).Encode(respuesta)
-
-	if err != nil {
-		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
-		return
-	}
+	json.NewEncoder(w).Encode(respuesta)
 }
 
-// servicioEliminarContenido permite eliminar un contenido
-// mediante una solicitud HTTP DELETE.
+// ============================================================
+// SERVICIO WEB 9
+// DELETE /api/contenidos/{id}
+// ============================================================
+
+// servicioEliminarContenido permite eliminar un contenido.
 func servicioEliminarContenido(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
 	if r.Method != http.MethodDelete {
-		http.Error(w, "Método no permitido. Utilice DELETE.", http.StatusMethodNotAllowed)
+		http.Error(
+			w,
+			"Método no permitido. Utilice DELETE.",
+			http.StatusMethodNotAllowed,
+		)
 		return
 	}
 
-	partes := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	partes := strings.Split(
+		strings.Trim(r.URL.Path, "/"),
+		"/",
+	)
 
 	if len(partes) != 3 {
-		http.Error(w, "Identificador de contenido inválido", http.StatusBadRequest)
+		http.Error(
+			w,
+			"Identificador de contenido inválido",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
 	id, err := strconv.Atoi(partes[2])
 
 	if err != nil {
-		http.Error(w, "El ID debe ser numérico", http.StatusBadRequest)
+		http.Error(
+			w,
+			"El ID debe ser numérico",
+			http.StatusBadRequest,
+		)
 		return
 	}
 
-	// En esta versión académica se considera registrado
-	// el contenido con ID 1.
 	if id != 1 {
-		http.Error(w, "Contenido no encontrado", http.StatusNotFound)
+		http.Error(
+			w,
+			"Contenido no encontrado",
+			http.StatusNotFound,
+		)
 		return
 	}
 
@@ -427,16 +646,15 @@ func servicioEliminarContenido(w http.ResponseWriter, r *http.Request) {
 		"id":      id,
 	}
 
-	err = json.NewEncoder(w).Encode(respuesta)
-
-	if err != nil {
-		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
-		return
-	}
+	json.NewEncoder(w).Encode(respuesta)
 }
 
-// servicioContenidoPorID permite dirigir las solicitudes
-// PUT y DELETE al servicio correspondiente.
+// ============================================================
+// CONTROLADOR DE CONTENIDOS POR ID
+// ============================================================
+
+// servicioContenidoPorID dirige las solicitudes PUT y DELETE
+// hacia el servicio correspondiente.
 func servicioContenidoPorID(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
@@ -456,46 +674,117 @@ func servicioContenidoPorID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ============================================================
+// SERVIDOR PRINCIPAL
+// ============================================================
+
 // iniciarServidor configura y pone en funcionamiento
 // el servidor web del Sistema de Gestión de Streaming.
 func iniciarServidor() {
 
+	// Página principal.
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set(
+			"Content-Type",
+			"text/plain; charset=utf-8",
+		)
 
-		fmt.Fprintln(w, "Sistema de Gestión de Streaming")
-		fmt.Fprintln(w, "Servidor web funcionando correctamente.")
+		fmt.Fprintln(
+			w,
+			"Sistema de Gestión de Streaming",
+		)
+
+		fmt.Fprintln(
+			w,
+			"Servidor web funcionando correctamente.",
+		)
+
+		fmt.Fprintln(
+			w,
+			"API disponible en /api",
+		)
 	})
 
-	// Servicio Web #1: consulta de información de contenidos.
-	http.HandleFunc("/api/contenidos", servicioContenidos)
+	// Servicio Web #1 y #2.
+	// GET  -> consultar contenidos.
+	// POST -> crear contenido.
+	http.HandleFunc(
+		"/api/contenidos",
+		func(w http.ResponseWriter, r *http.Request) {
 
-	// Servicio Web #2: consulta de categorías registradas.
-	http.HandleFunc("/api/categorias", servicioCategorias)
+			switch r.Method {
 
-	// Servicio Web #3: consulta de información de usuarios.
-	http.HandleFunc("/api/usuarios", servicioUsuarios)
+			case http.MethodGet:
+				servicioContenidos(w, r)
 
-	// Servicio Web #4: reproducción de películas y series.
-	http.HandleFunc("/api/reproduccion", servicioReproduccion)
+			case http.MethodPost:
+				servicioCrearContenido(w, r)
 
-	// Servicio Web #5: consulta de planes de suscripción.
-	http.HandleFunc("/api/planes", servicioPlanes)
+			default:
+				http.Error(
+					w,
+					"Método no permitido. Utilice GET o POST.",
+					http.StatusMethodNotAllowed,
+				)
+			}
+		},
+	)
 
-	// Servicio Web #6: búsqueda de contenidos por género.
-	http.HandleFunc("/api/contenidos/buscar", servicioBuscarContenido)
+	// Servicio Web #3.
+	http.HandleFunc(
+		"/api/categorias",
+		servicioCategorias,
+	)
 
-	// Servicios Web #7 y #8:
-	// actualización mediante PUT y eliminación mediante DELETE.
-	http.HandleFunc("/api/contenidos/", servicioContenidoPorID)
+	// Servicio Web #4.
+	http.HandleFunc(
+		"/api/usuarios",
+		servicioUsuarios,
+	)
 
-	fmt.Println("=== SISTEMA DE GESTIÓN DE STREAMING ===")
-	fmt.Println("Servidor iniciado en http://localhost:8080")
+	// Servicio Web #5.
+	http.HandleFunc(
+		"/api/reproduccion",
+		servicioReproduccion,
+	)
 
-	err := http.ListenAndServe(":8080", nil)
+	// Servicio Web #6.
+	http.HandleFunc(
+		"/api/planes",
+		servicioPlanes,
+	)
+
+	// Servicio Web #7.
+	http.HandleFunc(
+		"/api/contenidos/buscar",
+		servicioBuscarContenido,
+	)
+
+	// Servicios Web #8 y #9.
+	// PUT y DELETE.
+	http.HandleFunc(
+		"/api/contenidos/",
+		servicioContenidoPorID,
+	)
+
+	fmt.Println(
+		"=== SISTEMA DE GESTIÓN DE STREAMING ===",
+	)
+
+	fmt.Println(
+		"Servidor iniciado en http://localhost:8080",
+	)
+
+	err := http.ListenAndServe(
+		":8080",
+		nil,
+	)
 
 	if err != nil {
-		fmt.Println("Error al iniciar el servidor:", err)
+		fmt.Println(
+			"Error al iniciar el servidor:",
+			err,
+		)
 	}
 }
