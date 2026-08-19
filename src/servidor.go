@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // ContenidoRespuesta representa la información que se enviará
@@ -72,6 +73,34 @@ func servicioContenidos(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err := json.NewEncoder(w).Encode(respuesta)
+
+	if err != nil {
+		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
+		return
+	}
+}
+
+// servicioCategorias devuelve las categorías registradas
+// en el sistema utilizando formato JSON.
+func servicioCategorias(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	categoriasJSON := []map[string]interface{}{}
+
+	for _, categoria := range categorias {
+		categoriasJSON = append(categoriasJSON, map[string]interface{}{
+			"id":     categoria.idCategoria,
+			"nombre": categoria.GetNombre(),
+		})
+	}
+
+	err := json.NewEncoder(w).Encode(categoriasJSON)
 
 	if err != nil {
 		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
@@ -192,6 +221,81 @@ func servicioPlanes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// servicioBuscarContenido permite buscar contenidos
+// utilizando el género recibido como parámetro.
+func servicioBuscarContenido(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	generoBuscado := strings.TrimSpace(r.URL.Query().Get("genero"))
+
+	if generoBuscado == "" {
+		http.Error(
+			w,
+			"Debe proporcionar el parámetro genero",
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	contenidos := []ContenidoRespuesta{
+		{
+			ID:            1,
+			Titulo:        "Avatar 2",
+			Descripcion:   "Una historia de ciencia ficción en Pandora.",
+			Genero:        "Ciencia ficción",
+			Duracion:      180,
+			Clasificacion: "PG-13",
+		},
+		{
+			ID:            2,
+			Titulo:        "John Wick",
+			Descripcion:   "Un antiguo asesino regresa a la acción.",
+			Genero:        "Acción",
+			Duracion:      101,
+			Clasificacion: "R",
+		},
+		{
+			ID:            3,
+			Titulo:        "Son como niños",
+			Descripcion:   "Un grupo de amigos se reúne nuevamente.",
+			Genero:        "Comedia",
+			Duracion:      102,
+			Clasificacion: "PG-13",
+		},
+	}
+
+	resultados := []ContenidoRespuesta{}
+
+	for _, contenido := range contenidos {
+
+		if strings.EqualFold(contenido.Genero, generoBuscado) {
+			resultados = append(resultados, contenido)
+		}
+	}
+
+	if len(resultados) == 0 {
+		http.Error(
+			w,
+			"No se encontraron contenidos para el género indicado",
+			http.StatusNotFound,
+		)
+		return
+	}
+
+	err := json.NewEncoder(w).Encode(resultados)
+
+	if err != nil {
+		http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
+		return
+	}
+}
+
 // iniciarServidor configura y pone en funcionamiento
 // el servidor web del Sistema de Gestión de Streaming.
 func iniciarServidor() {
@@ -209,31 +313,7 @@ func iniciarServidor() {
 	http.HandleFunc("/api/contenidos", servicioContenidos)
 
 	// Servicio Web #2: consulta de categorías registradas.
-	http.HandleFunc("/api/categorias", func(w http.ResponseWriter, r *http.Request) {
-
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-
-		if r.Method != http.MethodGet {
-			http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
-			return
-		}
-
-		categoriasJSON := []map[string]interface{}{}
-
-		for _, categoria := range categorias {
-			categoriasJSON = append(categoriasJSON, map[string]interface{}{
-				"id":     categoria.idCategoria,
-				"nombre": categoria.GetNombre(),
-			})
-		}
-
-		err := json.NewEncoder(w).Encode(categoriasJSON)
-
-		if err != nil {
-			http.Error(w, "Error al generar el JSON", http.StatusInternalServerError)
-			return
-		}
-	})
+	http.HandleFunc("/api/categorias", servicioCategorias)
 
 	// Servicio Web #3: consulta de información de usuarios.
 	http.HandleFunc("/api/usuarios", servicioUsuarios)
@@ -243,6 +323,9 @@ func iniciarServidor() {
 
 	// Servicio Web #5: consulta de planes de suscripción.
 	http.HandleFunc("/api/planes", servicioPlanes)
+
+	// Servicio Web #6: búsqueda de contenidos por género.
+	http.HandleFunc("/api/contenidos/buscar", servicioBuscarContenido)
 
 	fmt.Println("=== SISTEMA DE GESTIÓN DE STREAMING ===")
 	fmt.Println("Servidor iniciado en http://localhost:8080")
