@@ -913,7 +913,16 @@ func servicioEliminarContenido(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if id != 1 {
+	indice := -1
+
+	for i, contenido := range contenidos {
+		if contenido.ID == id {
+			indice = i
+			break
+		}
+	}
+
+	if indice == -1 {
 		http.Error(
 			w,
 			"Contenido no encontrado",
@@ -921,6 +930,11 @@ func servicioEliminarContenido(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
+
+	contenidos = append(
+		contenidos[:indice],
+		contenidos[indice+1:]...,
+	)
 
 	respuesta := map[string]interface{}{
 		"mensaje": "Contenido eliminado correctamente",
