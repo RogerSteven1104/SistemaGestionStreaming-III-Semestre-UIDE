@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"SistemaGestionStreaming/database"
 )
 
 // ContenidoRespuesta representa la información pública de un contenido
@@ -129,7 +131,60 @@ func servicioContenidos(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(contenidos)
+	filas, err := database.DB.Query(`
+		SELECT id, titulo, descripcion, genero, duracion, clasificacion
+		FROM contenidos
+		ORDER BY id
+	`)
+
+	if err != nil {
+		http.Error(
+			w,
+			"Error al consultar los contenidos",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	defer filas.Close()
+
+	resultados := []ContenidoRespuesta{}
+
+	for filas.Next() {
+
+		var contenido ContenidoRespuesta
+
+		err := filas.Scan(
+			&contenido.ID,
+			&contenido.Titulo,
+			&contenido.Descripcion,
+			&contenido.Genero,
+			&contenido.Duracion,
+			&contenido.Clasificacion,
+		)
+
+		if err != nil {
+			http.Error(
+				w,
+				"Error al leer los contenidos",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		resultados = append(resultados, contenido)
+	}
+
+	if err := filas.Err(); err != nil {
+		http.Error(
+			w,
+			"Error al recorrer los contenidos",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	json.NewEncoder(w).Encode(resultados)
 }
 
 // ============================================================
@@ -210,10 +265,12 @@ func servicioCrearContenido(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nuevoID := 4
-
-	contenido := NuevoContenido(
-		nuevoID,
+	// Guardar el contenido directamente en SQLite.
+	resultado, err := database.DB.Exec(`
+		INSERT INTO contenidos
+		(titulo, descripcion, genero, duracion, clasificacion)
+		VALUES (?, ?, ?, ?, ?)
+	`,
 		datos.Titulo,
 		datos.Descripcion,
 		datos.Genero,
@@ -221,16 +278,35 @@ func servicioCrearContenido(w http.ResponseWriter, r *http.Request) {
 		datos.Clasificacion,
 	)
 
-	nuevoContenido := ContenidoRespuesta{
-		ID:            contenido.idContenido,
-		Titulo:        contenido.GetTitulo(),
-		Descripcion:   contenido.descripcion,
-		Genero:        contenido.GetGenero(),
-		Duracion:      contenido.GetDuracion(),
-		Clasificacion: contenido.clasificacion,
+	if err != nil {
+		http.Error(
+			w,
+			"Error al guardar el contenido en la base de datos",
+			http.StatusInternalServerError,
+		)
+		return
 	}
 
-	contenidos = append(contenidos, nuevoContenido)
+	// Obtener el ID generado por SQLite.
+	nuevoID, err := resultado.LastInsertId()
+
+	if err != nil {
+		http.Error(
+			w,
+			"Error al obtener el ID del contenido",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	nuevoContenido := ContenidoRespuesta{
+		ID:            int(nuevoID),
+		Titulo:        datos.Titulo,
+		Descripcion:   datos.Descripcion,
+		Genero:        datos.Genero,
+		Duracion:      datos.Duracion,
+		Clasificacion: datos.Clasificacion,
+	}
 
 	respuesta := map[string]interface{}{
 		"contenido": nuevoContenido,
@@ -754,7 +830,9 @@ func servicioBuscarContenido(w http.ResponseWriter, r *http.Request) {
 // SERVICIO WEB 8
 // PUT /api/contenidos/{id}
 // ============================================================
-// servicioActualizarContenido permite actualizar un contenido existente.
+
+// servicioActualizarContenido permite actualizar un contenido
+// existente directamente en la base de datos SQLite.
 func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -789,26 +867,6 @@ func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 			w,
 			"El ID debe ser numérico",
 			http.StatusBadRequest,
-		)
-		return
-	}
-
-	// Buscar el contenido dentro del catálogo central.
-	indice := -1
-
-	for i, contenido := range contenidos {
-		if contenido.ID == id {
-			indice = i
-			break
-		}
-	}
-
-	// Si no existe, devolver error 404.
-	if indice == -1 {
-		http.Error(
-			w,
-			"Contenido no encontrado",
-			http.StatusNotFound,
 		)
 		return
 	}
@@ -856,14 +914,79 @@ func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Actualizar el contenido existente dentro del catálogo.
-	contenidos[indice].Titulo = datos.Titulo
-	contenidos[indice].Genero = datos.Genero
-	contenidos[indice].Duracion = datos.Duracion
+	// Actualizar directamente el registro en SQLite.
+	resultado, err := database.DB.Exec(`
+		UPDATE contenidos
+		SET titulo = ?,
+		    genero = ?,
+		    duracion = ?
+		WHERE id = ?
+	`,
+		datos.Titulo,
+		datos.Genero,
+		datos.Duracion,
+		id,
+	)
+
+	if err != nil {
+		http.Error(
+			w,
+			"Error al actualizar el contenido en la base de datos",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	filasAfectadas, err := resultado.RowsAffected()
+
+	if err != nil {
+		http.Error(
+			w,
+			"Error al comprobar la actualización",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	if filasAfectadas == 0 {
+		http.Error(
+			w,
+			"Contenido no encontrado",
+			http.StatusNotFound,
+		)
+		return
+	}
+
+	// Consultar nuevamente el contenido actualizado.
+	var contenido ContenidoRespuesta
+
+	err = database.DB.QueryRow(`
+		SELECT id, titulo, descripcion, genero, duracion, clasificacion
+		FROM contenidos
+		WHERE id = ?
+	`,
+		id,
+	).Scan(
+		&contenido.ID,
+		&contenido.Titulo,
+		&contenido.Descripcion,
+		&contenido.Genero,
+		&contenido.Duracion,
+		&contenido.Clasificacion,
+	)
+
+	if err != nil {
+		http.Error(
+			w,
+			"Error al consultar el contenido actualizado",
+			http.StatusInternalServerError,
+		)
+		return
+	}
 
 	respuesta := map[string]interface{}{
 		"mensaje":   "Contenido actualizado correctamente",
-		"contenido": contenidos[indice],
+		"contenido": contenido,
 	}
 
 	json.NewEncoder(w).Encode(respuesta)
@@ -874,7 +997,8 @@ func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 // DELETE /api/contenidos/{id}
 // ============================================================
 
-// servicioEliminarContenido permite eliminar un contenido.
+// servicioEliminarContenido permite eliminar un contenido
+// directamente desde la base de datos SQLite.
 func servicioEliminarContenido(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -913,16 +1037,35 @@ func servicioEliminarContenido(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	indice := -1
+	// Eliminar directamente el contenido de SQLite.
+	resultado, err := database.DB.Exec(`
+		DELETE FROM contenidos
+		WHERE id = ?
+	`,
+		id,
+	)
 
-	for i, contenido := range contenidos {
-		if contenido.ID == id {
-			indice = i
-			break
-		}
+	if err != nil {
+		http.Error(
+			w,
+			"Error al eliminar el contenido de la base de datos",
+			http.StatusInternalServerError,
+		)
+		return
 	}
 
-	if indice == -1 {
+	filasAfectadas, err := resultado.RowsAffected()
+
+	if err != nil {
+		http.Error(
+			w,
+			"Error al comprobar la eliminación",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	if filasAfectadas == 0 {
 		http.Error(
 			w,
 			"Contenido no encontrado",
@@ -930,11 +1073,6 @@ func servicioEliminarContenido(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
-
-	contenidos = append(
-		contenidos[:indice],
-		contenidos[indice+1:]...,
-	)
 
 	respuesta := map[string]interface{}{
 		"mensaje": "Contenido eliminado correctamente",

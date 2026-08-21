@@ -3,9 +3,18 @@ package main
 import (
 	"errors"
 	"fmt"
+
+	"SistemaGestionStreaming/database"
 )
 
 func main() {
+
+	err := database.Conectar()
+
+	if err != nil {
+		fmt.Println("Error al conectar con la base de datos:", err)
+		return
+	}
 
 	// Creamos un nuevo usuario utilizando el constructor.
 	usuario := NuevoUsuario(
@@ -19,7 +28,7 @@ func main() {
 	fmt.Println("Nombre inicial:", usuario.GetNombre())
 
 	// Modificamos el nombre mediante el Setter.
-	err := usuario.SetNombre("Carlos")
+	err = usuario.SetNombre("Carlos")
 
 	if err != nil {
 		fmt.Println("Error:", err)
