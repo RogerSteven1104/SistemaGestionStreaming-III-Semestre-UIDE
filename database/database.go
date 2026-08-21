@@ -42,20 +42,25 @@ func crearTablas() error {
 
 	consulta := `
 CREATE TABLE IF NOT EXISTS contenidos (
-        id INTEGER PRIMARY KEY,
-        titulo TEXT NOT NULL,
-        descripcion TEXT NOT NULL,
-        genero TEXT NOT NULL,
-        duracion INTEGER NOT NULL,
-        clasificacion TEXT NOT NULL
+	id INTEGER PRIMARY KEY,
+	titulo TEXT NOT NULL,
+	descripcion TEXT NOT NULL,
+	genero TEXT NOT NULL,
+	duracion INTEGER NOT NULL,
+	clasificacion TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS usuarios (
-        id INTEGER PRIMARY KEY,
-        nombre TEXT NOT NULL,
-        correo TEXT NOT NULL UNIQUE,
-        contrasena TEXT,
-        plan TEXT NOT NULL
+	id INTEGER PRIMARY KEY,
+	nombre TEXT NOT NULL,
+	correo TEXT NOT NULL UNIQUE,
+	contrasena TEXT,
+	plan TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS categorias (
+	id INTEGER PRIMARY KEY,
+	nombre TEXT NOT NULL UNIQUE
 );
 	`
 
@@ -65,7 +70,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
 		return err
 	}
 
-	fmt.Println("Tablas contenidos y usuarios creadas correctamente")
+	fmt.Println("Tablas contenidos, usuarios y categorias creadas correctamente")
 
 	return nil
 }
@@ -191,6 +196,66 @@ func cargarDatosIniciales() error {
 	} else {
 
 		fmt.Println("La tabla usuarios ya contiene información")
+	}
+
+	// ============================================================
+	// CATEGORÍAS INICIALES
+	// ============================================================
+
+	var cantidadCategorias int
+
+	err = DB.QueryRow(
+		"SELECT COUNT(*) FROM categorias",
+	).Scan(&cantidadCategorias)
+
+	if err != nil {
+		return err
+	}
+
+	if cantidadCategorias == 0 {
+
+		consultaCategorias := `
+		INSERT INTO categorias
+		(id, nombre)
+		VALUES (?, ?)
+		`
+
+		categoriasIniciales := []struct {
+			id     int
+			nombre string
+		}{
+			{
+				1,
+				"Acción",
+			},
+			{
+				2,
+				"Comedia",
+			},
+			{
+				3,
+				"Ciencia ficción",
+			},
+		}
+
+		for _, categoria := range categoriasIniciales {
+
+			_, err := DB.Exec(
+				consultaCategorias,
+				categoria.id,
+				categoria.nombre,
+			)
+
+			if err != nil {
+				return err
+			}
+		}
+
+		fmt.Println("Categorías iniciales cargadas correctamente")
+
+	} else {
+
+		fmt.Println("La tabla categorias ya contiene información")
 	}
 
 	return nil

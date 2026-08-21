@@ -321,36 +321,370 @@ func servicioCrearContenido(w http.ResponseWriter, r *http.Request) {
 // ============================================================
 // SERVICIO WEB 3
 // GET /api/categorias
+// POST /api/categorias
+// PUT /api/categorias/{id}
+// DELETE /api/categorias/{id}
 // ============================================================
 
-// servicioCategorias devuelve las categorías registradas.
+// servicioCategorias gestiona las operaciones sobre las categorías.
+// Los datos se almacenan y consultan directamente desde SQLite.
 func servicioCategorias(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-	if r.Method != http.MethodGet {
+	switch r.Method {
+
+	case http.MethodGet:
+
+		// ========================================================
+		// GET /api/categorias
+		// ========================================================
+
+		filas, err := database.DB.Query(`
+			SELECT id, nombre
+			FROM categorias
+			ORDER BY id
+		`)
+
+		if err != nil {
+			http.Error(
+				w,
+				"Error al consultar las categorías",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		defer filas.Close()
+
+		categoriasJSON := []map[string]interface{}{}
+
+		for filas.Next() {
+
+			var id int
+			var nombre string
+
+			err := filas.Scan(
+				&id,
+				&nombre,
+			)
+
+			if err != nil {
+				http.Error(
+					w,
+					"Error al leer las categorías",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			categoriasJSON = append(
+				categoriasJSON,
+				map[string]interface{}{
+					"id":     id,
+					"nombre": nombre,
+				},
+			)
+		}
+
+		if err := filas.Err(); err != nil {
+			http.Error(
+				w,
+				"Error al recorrer las categorías",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		json.NewEncoder(w).Encode(categoriasJSON)
+
+	case http.MethodPost:
+
+		// ========================================================
+		// POST /api/categorias
+		// ========================================================
+
+		var datos struct {
+			Nombre string `json:"nombre"`
+		}
+
+		err := json.NewDecoder(r.Body).Decode(&datos)
+
+		if err != nil {
+			http.Error(
+				w,
+				"JSON inválido",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		datos.Nombre = strings.TrimSpace(datos.Nombre)
+
+		if datos.Nombre == "" {
+			http.Error(
+				w,
+				"El nombre de la categoría no puede estar vacío",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		resultado, err := database.DB.Exec(`
+			INSERT INTO categorias
+			(nombre)
+			VALUES (?)
+		`,
+			datos.Nombre,
+		)
+
+		if err != nil {
+
+			if strings.Contains(
+				strings.ToLower(err.Error()),
+				"unique",
+			) {
+				http.Error(
+					w,
+					"La categoría ya está registrada",
+					http.StatusConflict,
+				)
+				return
+			}
+
+			http.Error(
+				w,
+				"Error al guardar la categoría en la base de datos",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		nuevoID, err := resultado.LastInsertId()
+
+		if err != nil {
+			http.Error(
+				w,
+				"Error al obtener el ID de la categoría",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		nuevaCategoria := map[string]interface{}{
+			"id":     int(nuevoID),
+			"nombre": datos.Nombre,
+		}
+
+		respuesta := map[string]interface{}{
+			"mensaje":   "Categoría creada correctamente",
+			"categoria": nuevaCategoria,
+		}
+
+		w.WriteHeader(http.StatusCreated)
+
+		json.NewEncoder(w).Encode(respuesta)
+
+	case http.MethodPut:
+
+		// ========================================================
+		// PUT /api/categorias/{id}
+		// ========================================================
+
+		partes := strings.Split(
+			strings.Trim(r.URL.Path, "/"),
+			"/",
+		)
+
+		if len(partes) != 3 {
+			http.Error(
+				w,
+				"Identificador de categoría inválido",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		id, err := strconv.Atoi(partes[2])
+
+		if err != nil {
+			http.Error(
+				w,
+				"El ID debe ser numérico",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		var datos struct {
+			Nombre string `json:"nombre"`
+		}
+
+		err = json.NewDecoder(r.Body).Decode(&datos)
+
+		if err != nil {
+			http.Error(
+				w,
+				"JSON inválido",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		datos.Nombre = strings.TrimSpace(datos.Nombre)
+
+		if datos.Nombre == "" {
+			http.Error(
+				w,
+				"El nombre de la categoría no puede estar vacío",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		resultado, err := database.DB.Exec(`
+			UPDATE categorias
+			SET nombre = ?
+			WHERE id = ?
+		`,
+			datos.Nombre,
+			id,
+		)
+
+		if err != nil {
+
+			if strings.Contains(
+				strings.ToLower(err.Error()),
+				"unique",
+			) {
+				http.Error(
+					w,
+					"La categoría ya está registrada",
+					http.StatusConflict,
+				)
+				return
+			}
+
+			http.Error(
+				w,
+				"Error al actualizar la categoría",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		filasAfectadas, err := resultado.RowsAffected()
+
+		if err != nil {
+			http.Error(
+				w,
+				"Error al verificar la actualización",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		if filasAfectadas == 0 {
+			http.Error(
+				w,
+				"Categoría no encontrada",
+				http.StatusNotFound,
+			)
+			return
+		}
+
+		categoriaActualizada := map[string]interface{}{
+			"id":     id,
+			"nombre": datos.Nombre,
+		}
+
+		respuesta := map[string]interface{}{
+			"mensaje":   "Categoría actualizada correctamente",
+			"categoria": categoriaActualizada,
+		}
+
+		json.NewEncoder(w).Encode(respuesta)
+
+	case http.MethodDelete:
+
+		// ========================================================
+		// DELETE /api/categorias/{id}
+		// ========================================================
+
+		partes := strings.Split(
+			strings.Trim(r.URL.Path, "/"),
+			"/",
+		)
+
+		if len(partes) != 3 {
+			http.Error(
+				w,
+				"Identificador de categoría inválido",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		id, err := strconv.Atoi(partes[2])
+
+		if err != nil {
+			http.Error(
+				w,
+				"El ID debe ser numérico",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		resultado, err := database.DB.Exec(
+			"DELETE FROM categorias WHERE id = ?",
+			id,
+		)
+
+		if err != nil {
+			http.Error(
+				w,
+				"Error al eliminar la categoría",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		filasAfectadas, err := resultado.RowsAffected()
+
+		if err != nil {
+			http.Error(
+				w,
+				"Error al verificar la eliminación",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		if filasAfectadas == 0 {
+			http.Error(
+				w,
+				"Categoría no encontrada",
+				http.StatusNotFound,
+			)
+			return
+		}
+
+		respuesta := map[string]interface{}{
+			"id":      id,
+			"mensaje": "Categoría eliminada correctamente",
+		}
+
+		json.NewEncoder(w).Encode(respuesta)
+
+	default:
+
 		http.Error(
 			w,
-			"Método no permitido. Utilice GET.",
+			"Método no permitido. Utilice GET, POST, PUT o DELETE.",
 			http.StatusMethodNotAllowed,
 		)
-		return
 	}
-
-	categoriasJSON := []map[string]interface{}{}
-
-	for _, categoria := range categorias {
-
-		categoriasJSON = append(
-			categoriasJSON,
-			map[string]interface{}{
-				"id":     categoria.idCategoria,
-				"nombre": categoria.GetNombre(),
-			},
-		)
-	}
-
-	json.NewEncoder(w).Encode(categoriasJSON)
 }
 
 // ============================================================
@@ -1262,8 +1596,18 @@ func iniciarServidor() {
 	)
 
 	// Servicio Web #3.
+	// GET  -> consultar categorías.
+	// POST -> crear categorías.
 	http.HandleFunc(
 		"/api/categorias",
+		servicioCategorias,
+	)
+
+	// Servicio Web #3.1.
+	// PUT    -> actualizar categoría.
+	// DELETE -> eliminar categoría.
+	http.HandleFunc(
+		"/api/categorias/",
 		servicioCategorias,
 	)
 

@@ -14,6 +14,7 @@ var contenidosReproducibles []Reproducible
 
 // AgregarReproducible incorpora un elemento al catálogo.
 func AgregarReproducible(elemento Reproducible) error {
+
 	if elemento == nil {
 		return fmt.Errorf("no se puede agregar un contenido vacío")
 	}
@@ -25,6 +26,7 @@ func AgregarReproducible(elemento Reproducible) error {
 
 // ReproducirCatalogo reproduce todos los elementos registrados.
 func ReproducirCatalogo() {
+
 	fmt.Println("=== CATÁLOGO DE REPRODUCCIÓN ===")
 
 	for _, elemento := range contenidosReproducibles {
