@@ -356,10 +356,11 @@ func servicioCategorias(w http.ResponseWriter, r *http.Request) {
 // ============================================================
 // SERVICIO WEB 4
 // GET /api/usuarios
+// POST /api/usuarios
 // ============================================================
 
 // servicioUsuarios gestiona las operaciones sobre los usuarios.
-// Permite consultar, registrar, actualizar y eliminar usuarios.
+// Los datos se almacenan y consultan directamente desde SQLite.
 func servicioUsuarios(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -368,19 +369,56 @@ func servicioUsuarios(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodGet:
 
+		// Consultar usuarios directamente desde SQLite.
+		filas, err := database.DB.Query(`
+			SELECT id, nombre, correo, plan
+			FROM usuarios
+			ORDER BY id
+		`)
+
+		if err != nil {
+			http.Error(
+				w,
+				"Error al consultar los usuarios",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		defer filas.Close()
+
 		respuesta := []UsuarioRespuesta{}
 
-		for _, usuario := range usuarios {
+		for filas.Next() {
 
-			respuesta = append(
-				respuesta,
-				UsuarioRespuesta{
-					ID:     usuario.GetID(),
-					Nombre: usuario.GetNombre(),
-					Correo: usuario.GetCorreo(),
-					Plan:   usuario.GetPlan(),
-				},
+			var usuario UsuarioRespuesta
+
+			err := filas.Scan(
+				&usuario.ID,
+				&usuario.Nombre,
+				&usuario.Correo,
+				&usuario.Plan,
 			)
+
+			if err != nil {
+				http.Error(
+					w,
+					"Error al leer los usuarios",
+					http.StatusInternalServerError,
+				)
+				return
+			}
+
+			respuesta = append(respuesta, usuario)
+		}
+
+		if err := filas.Err(); err != nil {
+			http.Error(
+				w,
+				"Error al recorrer los usuarios",
+				http.StatusInternalServerError,
+			)
+			return
 		}
 
 		json.NewEncoder(w).Encode(respuesta)
@@ -435,215 +473,66 @@ func servicioUsuarios(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		nuevoID := 1
-
-		if len(usuarios) > 0 {
-			nuevoID = usuarios[len(usuarios)-1].GetID() + 1
-		}
-
-		nuevoUsuario := NuevoUsuario(
-			nuevoID,
+		// Insertar el usuario directamente en SQLite.
+		resultado, err := database.DB.Exec(`
+			INSERT INTO usuarios
+			(nombre, correo, contrasena, plan)
+			VALUES (?, ?, ?, ?)
+		`,
 			datos.Nombre,
 			datos.Correo,
 			"",
 			datos.Plan,
 		)
 
-		usuarios = append(
-			usuarios,
-			nuevoUsuario,
-		)
+		if err != nil {
+
+			// SQLite devuelve error si el correo ya existe
+			// porque la columna correo tiene restricción UNIQUE.
+			if strings.Contains(
+				strings.ToLower(err.Error()),
+				"unique",
+			) {
+				http.Error(
+					w,
+					"El correo ya está registrado",
+					http.StatusConflict,
+				)
+				return
+			}
+
+			http.Error(
+				w,
+				"Error al guardar el usuario en la base de datos",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		nuevoID, err := resultado.LastInsertId()
+
+		if err != nil {
+			http.Error(
+				w,
+				"Error al obtener el ID del usuario",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		nuevoUsuario := UsuarioRespuesta{
+			ID:     int(nuevoID),
+			Nombre: datos.Nombre,
+			Correo: datos.Correo,
+			Plan:   datos.Plan,
+		}
 
 		respuesta := map[string]interface{}{
 			"mensaje": "Usuario creado correctamente",
-			"usuario": UsuarioRespuesta{
-				ID:     nuevoUsuario.GetID(),
-				Nombre: nuevoUsuario.GetNombre(),
-				Correo: nuevoUsuario.GetCorreo(),
-				Plan:   nuevoUsuario.GetPlan(),
-			},
+			"usuario": nuevoUsuario,
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(respuesta)
-
-	case http.MethodPut:
-
-		partes := strings.Split(
-			strings.Trim(r.URL.Path, "/"),
-			"/",
-		)
-
-		if len(partes) != 3 {
-			http.Error(
-				w,
-				"Identificador de usuario inválido",
-				http.StatusBadRequest,
-			)
-			return
-		}
-
-		id, err := strconv.Atoi(partes[2])
-
-		if err != nil {
-			http.Error(
-				w,
-				"El ID debe ser numérico",
-				http.StatusBadRequest,
-			)
-			return
-		}
-
-		var usuarioEncontrado *Usuario
-
-		for _, usuario := range usuarios {
-
-			if usuario.GetID() == id {
-				usuarioEncontrado = usuario
-				break
-			}
-		}
-
-		if usuarioEncontrado == nil {
-			http.Error(
-				w,
-				"Usuario no encontrado",
-				http.StatusNotFound,
-			)
-			return
-		}
-
-		var datos struct {
-			Nombre string `json:"nombre"`
-			Correo string `json:"correo"`
-			Plan   string `json:"plan"`
-		}
-
-		err = json.NewDecoder(r.Body).Decode(&datos)
-
-		if err != nil {
-			http.Error(
-				w,
-				"JSON inválido",
-				http.StatusBadRequest,
-			)
-			return
-		}
-
-		datos.Nombre = strings.TrimSpace(datos.Nombre)
-		datos.Correo = strings.TrimSpace(datos.Correo)
-		datos.Plan = strings.TrimSpace(datos.Plan)
-
-		if datos.Nombre == "" {
-			http.Error(
-				w,
-				"El nombre no puede estar vacío",
-				http.StatusBadRequest,
-			)
-			return
-		}
-
-		if datos.Correo == "" {
-			http.Error(
-				w,
-				"El correo no puede estar vacío",
-				http.StatusBadRequest,
-			)
-			return
-		}
-
-		if datos.Plan == "" {
-			http.Error(
-				w,
-				"El plan no puede estar vacío",
-				http.StatusBadRequest,
-			)
-			return
-		}
-
-		usuarioActualizado := NuevoUsuario(
-			id,
-			datos.Nombre,
-			datos.Correo,
-			"",
-			datos.Plan,
-		)
-
-		for i, usuario := range usuarios {
-
-			if usuario.GetID() == id {
-				usuarios[i] = usuarioActualizado
-				break
-			}
-		}
-
-		respuesta := map[string]interface{}{
-			"mensaje": "Usuario actualizado correctamente",
-			"usuario": UsuarioRespuesta{
-				ID:     usuarioActualizado.GetID(),
-				Nombre: usuarioActualizado.GetNombre(),
-				Correo: usuarioActualizado.GetCorreo(),
-				Plan:   usuarioActualizado.GetPlan(),
-			},
-		}
-
-		json.NewEncoder(w).Encode(respuesta)
-
-	case http.MethodDelete:
-
-		partes := strings.Split(
-			strings.Trim(r.URL.Path, "/"),
-			"/",
-		)
-
-		if len(partes) != 3 {
-			http.Error(
-				w,
-				"Identificador de usuario inválido",
-				http.StatusBadRequest,
-			)
-			return
-		}
-
-		id, err := strconv.Atoi(partes[2])
-
-		if err != nil {
-			http.Error(
-				w,
-				"El ID debe ser numérico",
-				http.StatusBadRequest,
-			)
-			return
-		}
-
-		indice := -1
-
-		for i, usuario := range usuarios {
-
-			if usuario.GetID() == id {
-				indice = i
-				break
-			}
-		}
-
-		if indice == -1 {
-			http.Error(
-				w,
-				"Usuario no encontrado",
-				http.StatusNotFound,
-			)
-			return
-		}
-
-		usuarios = append(
-			usuarios[:indice],
-			usuarios[indice+1:]...,
-		)
-
-		respuesta := map[string]interface{}{
-			"mensaje": "Usuario eliminado correctamente",
-			"id":      id,
-		}
 
 		json.NewEncoder(w).Encode(respuesta)
 
@@ -651,7 +540,7 @@ func servicioUsuarios(w http.ResponseWriter, r *http.Request) {
 
 		http.Error(
 			w,
-			"Método no permitido. Utilice GET, POST, PUT o DELETE.",
+			"Método no permitido. Utilice GET o POST.",
 			http.StatusMethodNotAllowed,
 		)
 	}
