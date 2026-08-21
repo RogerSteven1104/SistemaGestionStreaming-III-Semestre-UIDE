@@ -357,6 +357,8 @@ func servicioCategorias(w http.ResponseWriter, r *http.Request) {
 // SERVICIO WEB 4
 // GET /api/usuarios
 // POST /api/usuarios
+// PUT /api/usuarios/{id}
+// DELETE /api/usuarios/{id}
 // ============================================================
 
 // servicioUsuarios gestiona las operaciones sobre los usuarios.
@@ -369,7 +371,6 @@ func servicioUsuarios(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodGet:
 
-		// Consultar usuarios directamente desde SQLite.
 		filas, err := database.DB.Query(`
 			SELECT id, nombre, correo, plan
 			FROM usuarios
@@ -473,7 +474,6 @@ func servicioUsuarios(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Insertar el usuario directamente en SQLite.
 		resultado, err := database.DB.Exec(`
 			INSERT INTO usuarios
 			(nombre, correo, contrasena, plan)
@@ -487,8 +487,6 @@ func servicioUsuarios(w http.ResponseWriter, r *http.Request) {
 
 		if err != nil {
 
-			// SQLite devuelve error si el correo ya existe
-			// porque la columna correo tiene restricción UNIQUE.
 			if strings.Contains(
 				strings.ToLower(err.Error()),
 				"unique",
@@ -536,11 +534,221 @@ func servicioUsuarios(w http.ResponseWriter, r *http.Request) {
 
 		json.NewEncoder(w).Encode(respuesta)
 
+	case http.MethodPut:
+
+		partes := strings.Split(
+			strings.Trim(r.URL.Path, "/"),
+			"/",
+		)
+
+		if len(partes) != 3 {
+			http.Error(
+				w,
+				"Identificador de usuario inválido",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		id, err := strconv.Atoi(partes[2])
+
+		if err != nil {
+			http.Error(
+				w,
+				"El ID debe ser numérico",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		var datos struct {
+			Nombre string `json:"nombre"`
+			Correo string `json:"correo"`
+			Plan   string `json:"plan"`
+		}
+
+		err = json.NewDecoder(r.Body).Decode(&datos)
+
+		if err != nil {
+			http.Error(
+				w,
+				"JSON inválido",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		datos.Nombre = strings.TrimSpace(datos.Nombre)
+		datos.Correo = strings.TrimSpace(datos.Correo)
+		datos.Plan = strings.TrimSpace(datos.Plan)
+
+		if datos.Nombre == "" {
+			http.Error(
+				w,
+				"El nombre no puede estar vacío",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		if datos.Correo == "" {
+			http.Error(
+				w,
+				"El correo no puede estar vacío",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		if datos.Plan == "" {
+			http.Error(
+				w,
+				"El plan no puede estar vacío",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		resultado, err := database.DB.Exec(`
+			UPDATE usuarios
+			SET nombre = ?, correo = ?, plan = ?
+			WHERE id = ?
+		`,
+			datos.Nombre,
+			datos.Correo,
+			datos.Plan,
+			id,
+		)
+
+		if err != nil {
+
+			if strings.Contains(
+				strings.ToLower(err.Error()),
+				"unique",
+			) {
+				http.Error(
+					w,
+					"El correo ya está registrado",
+					http.StatusConflict,
+				)
+				return
+			}
+
+			http.Error(
+				w,
+				"Error al actualizar el usuario",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		filasAfectadas, err := resultado.RowsAffected()
+
+		if err != nil {
+			http.Error(
+				w,
+				"Error al verificar la actualización",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		if filasAfectadas == 0 {
+			http.Error(
+				w,
+				"Usuario no encontrado",
+				http.StatusNotFound,
+			)
+			return
+		}
+
+		usuarioActualizado := UsuarioRespuesta{
+			ID:     id,
+			Nombre: datos.Nombre,
+			Correo: datos.Correo,
+			Plan:   datos.Plan,
+		}
+
+		respuesta := map[string]interface{}{
+			"mensaje": "Usuario actualizado correctamente",
+			"usuario": usuarioActualizado,
+		}
+
+		json.NewEncoder(w).Encode(respuesta)
+
+	case http.MethodDelete:
+
+		partes := strings.Split(
+			strings.Trim(r.URL.Path, "/"),
+			"/",
+		)
+
+		if len(partes) != 3 {
+			http.Error(
+				w,
+				"Identificador de usuario inválido",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		id, err := strconv.Atoi(partes[2])
+
+		if err != nil {
+			http.Error(
+				w,
+				"El ID debe ser numérico",
+				http.StatusBadRequest,
+			)
+			return
+		}
+
+		resultado, err := database.DB.Exec(
+			"DELETE FROM usuarios WHERE id = ?",
+			id,
+		)
+
+		if err != nil {
+			http.Error(
+				w,
+				"Error al eliminar el usuario",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		filasAfectadas, err := resultado.RowsAffected()
+
+		if err != nil {
+			http.Error(
+				w,
+				"Error al verificar la eliminación",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		if filasAfectadas == 0 {
+			http.Error(
+				w,
+				"Usuario no encontrado",
+				http.StatusNotFound,
+			)
+			return
+		}
+
+		respuesta := map[string]interface{}{
+			"id":      id,
+			"mensaje": "Usuario eliminado correctamente",
+		}
+
+		json.NewEncoder(w).Encode(respuesta)
+
 	default:
 
 		http.Error(
 			w,
-			"Método no permitido. Utilice GET o POST.",
+			"Método no permitido. Utilice GET, POST, PUT o DELETE.",
 			http.StatusMethodNotAllowed,
 		)
 	}
