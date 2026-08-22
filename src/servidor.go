@@ -1179,10 +1179,14 @@ func servicioPlanes(w http.ResponseWriter, r *http.Request) {
 // GET /api/contenidos/buscar?genero=...
 // ============================================================
 
-// servicioBuscarContenido permite buscar contenidos por género.
+// servicioBuscarContenido permite buscar contenidos por género
+// directamente desde la base de datos SQLite.
 func servicioBuscarContenido(w http.ResponseWriter, r *http.Request) {
 
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set(
+		"Content-Type",
+		"application/json; charset=utf-8",
+	)
 
 	if r.Method != http.MethodGet {
 		http.Error(
@@ -1206,44 +1210,70 @@ func servicioBuscarContenido(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contenidos := []ContenidoRespuesta{
-		{
-			ID:            1,
-			Titulo:        "Avatar 2",
-			Descripcion:   "Una historia de ciencia ficción en Pandora.",
-			Genero:        "Ciencia ficción",
-			Duracion:      180,
-			Clasificacion: "PG-13",
-		},
-		{
-			ID:            2,
-			Titulo:        "John Wick",
-			Descripcion:   "Un antiguo asesino regresa a la acción.",
-			Genero:        "Acción",
-			Duracion:      101,
-			Clasificacion: "R",
-		},
-		{
-			ID:            3,
-			Titulo:        "Son como niños",
-			Descripcion:   "Un grupo de amigos se reúne nuevamente.",
-			Genero:        "Comedia",
-			Duracion:      102,
-			Clasificacion: "PG-13",
-		},
+	// ========================================================
+	// CONSULTA DIRECTAMENTE DESDE SQLITE
+	// ========================================================
+
+	filas, err := database.DB.Query(`
+		SELECT id, titulo, descripcion, genero, duracion, clasificacion
+		FROM contenidos
+		WHERE LOWER(genero) = LOWER(?)
+		ORDER BY id
+	`, generoBuscado)
+
+	if err != nil {
+		http.Error(
+			w,
+			"Error al consultar los contenidos",
+			http.StatusInternalServerError,
+		)
+		return
 	}
+
+	defer filas.Close()
 
 	resultados := []ContenidoRespuesta{}
 
-	for _, contenido := range contenidos {
+	for filas.Next() {
 
-		if strings.EqualFold(
-			contenido.Genero,
-			generoBuscado,
-		) {
-			resultados = append(resultados, contenido)
+		var contenido ContenidoRespuesta
+
+		err := filas.Scan(
+			&contenido.ID,
+			&contenido.Titulo,
+			&contenido.Descripcion,
+			&contenido.Genero,
+			&contenido.Duracion,
+			&contenido.Clasificacion,
+		)
+
+		if err != nil {
+			http.Error(
+				w,
+				"Error al leer los contenidos",
+				http.StatusInternalServerError,
+			)
+			return
 		}
+
+		resultados = append(
+			resultados,
+			contenido,
+		)
 	}
+
+	if err := filas.Err(); err != nil {
+		http.Error(
+			w,
+			"Error al recorrer los contenidos",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	// ========================================================
+	// VALIDAR SI EXISTEN RESULTADOS
+	// ========================================================
 
 	if len(resultados) == 0 {
 		http.Error(
@@ -1266,7 +1296,10 @@ func servicioBuscarContenido(w http.ResponseWriter, r *http.Request) {
 // existente directamente en la base de datos SQLite.
 func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set(
+		"Content-Type",
+		"application/json; charset=utf-8",
+	)
 
 	if r.Method != http.MethodPut {
 		http.Error(
@@ -1276,6 +1309,10 @@ func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
+
+	// ========================================================
+	// OBTENER ID DEL CONTENIDO
+	// ========================================================
 
 	partes := strings.Split(
 		strings.Trim(r.URL.Path, "/"),
@@ -1302,6 +1339,39 @@ func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ========================================================
+	// VERIFICAR QUE EL CONTENIDO EXISTA
+	// ========================================================
+
+	var existe int
+
+	err = database.DB.QueryRow(
+		"SELECT COUNT(*) FROM contenidos WHERE id = ?",
+		id,
+	).Scan(&existe)
+
+	if err != nil {
+		http.Error(
+			w,
+			"Error al verificar el contenido",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	if existe == 0 {
+		http.Error(
+			w,
+			"Contenido no encontrado",
+			http.StatusNotFound,
+		)
+		return
+	}
+
+	// ========================================================
+	// LEER DATOS RECIBIDOS
+	// ========================================================
+
 	var datos ActualizacionContenido
 
 	err = json.NewDecoder(r.Body).Decode(&datos)
@@ -1317,6 +1387,10 @@ func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 
 	datos.Titulo = strings.TrimSpace(datos.Titulo)
 	datos.Genero = strings.TrimSpace(datos.Genero)
+
+	// ========================================================
+	// VALIDACIONES
+	// ========================================================
 
 	if datos.Titulo == "" {
 		http.Error(
@@ -1345,8 +1419,11 @@ func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Actualizar directamente el registro en SQLite.
-	resultado, err := database.DB.Exec(`
+	// ========================================================
+	// ACTUALIZAR CONTENIDO EN SQLITE
+	// ========================================================
+
+	_, err = database.DB.Exec(`
 		UPDATE contenidos
 		SET titulo = ?,
 		    genero = ?,
@@ -1368,27 +1445,10 @@ func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filasAfectadas, err := resultado.RowsAffected()
+	// ========================================================
+	// CONSULTAR CONTENIDO ACTUALIZADO
+	// ========================================================
 
-	if err != nil {
-		http.Error(
-			w,
-			"Error al comprobar la actualización",
-			http.StatusInternalServerError,
-		)
-		return
-	}
-
-	if filasAfectadas == 0 {
-		http.Error(
-			w,
-			"Contenido no encontrado",
-			http.StatusNotFound,
-		)
-		return
-	}
-
-	// Consultar nuevamente el contenido actualizado.
 	var contenido ContenidoRespuesta
 
 	err = database.DB.QueryRow(`
@@ -1414,6 +1474,10 @@ func servicioActualizarContenido(w http.ResponseWriter, r *http.Request) {
 		)
 		return
 	}
+
+	// ========================================================
+	// RESPUESTA
+	// ========================================================
 
 	respuesta := map[string]interface{}{
 		"mensaje":   "Contenido actualizado correctamente",
